@@ -1,0 +1,126 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  traefik:
+    image: traefik:v3.7.13
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION}
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:5678:5678"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls=true"
+      - "traefik.http.routers.n8n.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+      - "traefik.http.middlewares.n8n-security.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.n8n-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.n8n-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.n8n-security.headers.contentTypeNosniff=true"
+      - "traefik.http.routers.n8n.middlewares=n8n-security@docker"
+    environment:
+      N8N_HOST: "${SUBDOMAIN}.${DOMAIN_NAME}"
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: "https"
+      N8N_PROXY_HOPS: "1"
+      N8N_WEBHOOK_URL: "https://${SUBDOMAIN}.${DOMAIN_NAME}/"
+      N8N_EDITOR_BASE_URL: "https://${SUBDOMAIN}.${DOMAIN_NAME}/"
+      NODE_ENV: "production"
+      GENERIC_TIMEZONE: "${GENERIC_TIMEZONE}"
+      TZ: "${GENERIC_TIMEZONE}"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
+      N8N_RESTRICT_FILE_ACCESS_TO: "/files"
+      N8N_RUNNERS_MODE: "external"
+      N8N_RUNNERS_AUTH_TOKEN: "${N8N_RUNNERS_AUTH_TOKEN}"
+      N8N_RUNNERS_BROKER_LISTEN_ADDRESS: "0.0.0.0"
+      N8N_CONCURRENCY_PRODUCTION_LIMIT: "2"
+      DB_TYPE: "postgresdb"
+      DB_POSTGRESDB_HOST: "${DB_POSTGRESDB_HOST}"
+      DB_POSTGRESDB_PORT: "${DB_POSTGRESDB_PORT}"
+      DB_POSTGRESDB_DATABASE: "${DB_POSTGRESDB_DATABASE}"
+      DB_POSTGRESDB_USER: "${DB_POSTGRESDB_USER}"
+      DB_POSTGRESDB_PASSWORD_FILE: "/run/secrets/postgres_password"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
+    secrets:
+      - postgres_password
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./local-files:/files
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5678/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  task-runners:
+    image: n8nio/runners:${N8N_VERSION}
+    restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 256m
+    environment:
+      N8N_RUNNERS_TASK_BROKER_URI: "http://n8n:5679"
+      N8N_RUNNERS_AUTH_TOKEN: "${N8N_RUNNERS_AUTH_TOKEN}"
+      N8N_RUNNERS_MAX_CONCURRENCY: "1"
+      N8N_RUNNERS_MAX_OLD_SPACE_SIZE: "128"
+      N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT: "15"
+      GENERIC_TIMEZONE: "${GENERIC_TIMEZONE}"
+    depends_on:
+      n8n:
+        condition: service_healthy
+
+  static:
+    image: nginx:alpine
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./static:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.static.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`) && PathRegexp(`^/.*\\.txt$`)"
+      - "traefik.http.routers.static.entrypoints=websecure"
+      - "traefik.http.routers.static.tls=true"
+      - "traefik.http.routers.static.tls.certresolver=mytlschallenge"
+      - "traefik.http.routers.static.priority=100"
+      - "traefik.http.services.static.loadbalancer.server.port=80"
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+
+volumes:
+  n8n_data:
+  traefik_data:
