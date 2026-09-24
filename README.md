@@ -88,6 +88,10 @@ runner container memory limit:        256 MiB
 execution history:                    14 days / max 5000
 execution detail display limit:       20 MiB
 binary data:                           filesystem
+unverified community packages:            explicitly enabled
+task-runner task timeout:                  300 seconds
+Compression decompressed-size cap:         256 MiB
+Compression ZIP entry cap:                 1000
 ```
 
 `/home/node/.n8n` is backed by the persistent `n8n_data` volume, so filesystem binary data survives container recreation and is pruned with normal execution-data pruning.
