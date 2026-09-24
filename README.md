@@ -95,34 +95,14 @@ Treat that directory as a secret. The export scripts are **not** a complete inst
 
 The importer requires explicit confirmation. n8n imports retain IDs, so matching IDs in the target database can be overwritten.
 
-## GitHub authentication on the server
+## GitHub access on the server
 
-A production server only needs read access. Use a repository-specific **read-only GitHub Deploy Key**, not a personal access token.
+This repository is intended to be public. A production server therefore needs no GitHub credentials for read-only deployment.
 
-On the Linux server, as the user that owns `/opt/n8n-compose`:
-
-```bash
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-ssh-keygen -t ed25519 -f ~/.ssh/n8n-oracle -C "n8n-oracle deploy key" -N ''
-cat ~/.ssh/n8n-oracle.pub
-```
-
-Add the printed public key to this repository under **Settings → Deploy keys**. Leave **Allow write access** disabled.
-
-Then configure a dedicated SSH host alias:
+Use the HTTPS remote:
 
 ```bash
-cat >> ~/.ssh/config <<'EOF'
-Host github-n8n-oracle
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/n8n-oracle
-  IdentitiesOnly yes
-EOF
-
-chmod 600 ~/.ssh/config
-git ls-remote git@github-n8n-oracle:huangshirui/n8n-oracle.git
+git ls-remote https://github.com/huangshirui/n8n-oracle.git
 ```
 
 ## Convert the existing /opt/n8n-compose directory to Git
@@ -160,7 +140,7 @@ Then attach the existing directory to GitHub:
 cd /opt/n8n-compose
 
 git init
-git remote add origin git@github-n8n-oracle:huangshirui/n8n-oracle.git
+git remote add origin https://github.com/huangshirui/n8n-oracle.git
 git fetch origin main
 git checkout -f -B main origin/main
 git branch --set-upstream-to=origin/main main
