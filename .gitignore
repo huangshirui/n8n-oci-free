@@ -1,0 +1,11 @@
+.env
+secrets/*
+!secrets/.gitkeep
+!secrets/*.example
+
+local-files/*
+!local-files/.gitkeep
+
+backups/
+n8n_export_*/
+*.bak
