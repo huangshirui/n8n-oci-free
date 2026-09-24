@@ -48,7 +48,7 @@ chown "$DEPLOY_USER:$DEPLOY_USER" "$PROJECT_DIR"
 sudo -u "$DEPLOY_USER" git clone "$REPO_URL" "$PROJECT_DIR"
 
 cd "$PROJECT_DIR"
-mkdir -p secrets local-files static
+mkdir -p secrets/traefik local-files static
 chmod +x scripts/*.sh
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$PROJECT_DIR"
 
@@ -61,7 +61,7 @@ if [[ ! -f secrets/postgres_password.txt ]]; then
   install -m 600 /dev/null secrets/postgres_password.txt
 fi
 
-chown "$DEPLOY_USER:$DEPLOY_USER" .env secrets/postgres_password.txt
+chown "$DEPLOY_USER:$DEPLOY_USER" .env secrets/postgres_password.txt secrets/traefik
 
 cat <<EOF
 Bootstrap complete.
@@ -70,6 +70,10 @@ Before starting n8n:
   1. Edit $PROJECT_DIR/.env
   2. Put the PostgreSQL password in $PROJECT_DIR/secrets/postgres_password.txt
   3. Generate N8N_RUNNERS_AUTH_TOKEN with: openssl rand -hex 32
-  4. Log out/in once so $DEPLOY_USER gets Docker group membership, or run Docker with sudo for this session.
-  5. Run: cd $PROJECT_DIR && docker compose config --quiet && docker compose up -d
+  4. In Cloudflare, create an Origin CA certificate for the n8n hostname.
+  5. Save the certificate as $PROJECT_DIR/secrets/traefik/n8n-origin.crt
+  6. Save its private key as $PROJECT_DIR/secrets/traefik/n8n-origin.key and chmod 600 both files.
+  7. Set the Cloudflare SSL/TLS mode to Full (strict) after the origin certificate is installed.
+  8. Log out/in once so $DEPLOY_USER gets Docker group membership, or run Docker with sudo for this session.
+  9. Run: cd $PROJECT_DIR && docker compose config --quiet && docker compose up -d
 EOF
