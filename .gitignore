@@ -9,3 +9,4 @@ local-files/*
 backups/
 n8n_export_*/
 *.bak
+*.log
