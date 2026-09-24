@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PROJECT_DIR="${N8N_PROJECT_DIR:-/opt/n8n-compose}"
+BRANCH="${N8N_GIT_BRANCH:-main}"
+LOG_FILE="${N8N_UPGRADE_LOG:-/var/log/n8n-upgrade.log}"
+
+log() {
+  printf '%s - %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG_FILE"
+}
+
+cd "$PROJECT_DIR"
+
+if [[ ! -d .git ]]; then
+  log "ERROR: $PROJECT_DIR is not a Git working tree"
+  exit 1
+fi
+
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  log "ERROR: tracked files have local modifications; refusing to overwrite them"
+  git status --short | tee -a "$LOG_FILE"
+  exit 1
+fi
+
+OLD_COMMIT=$(git rev-parse HEAD)
+git fetch --prune origin "$BRANCH"
+NEW_COMMIT=$(git rev-parse "origin/$BRANCH")
+
+if [[ "$OLD_COMMIT" == "$NEW_COMMIT" ]]; then
+  log "No Git changes; deployment already at $OLD_COMMIT"
+  exit 0
+fi
+
+log "Updating $OLD_COMMIT -> $NEW_COMMIT"
+git merge --ff-only "origin/$BRANCH"
+
+docker compose config --quiet
+docker compose pull
+docker compose up -d --remove-orphans
+
+for _ in $(seq 1 30); do
+  status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(docker compose ps -q n8n)" 2>/dev/null || true)
+  if [[ "$status" == "healthy" ]]; then
+    log "Deployment healthy at $(git rev-parse HEAD)"
+    docker image prune -f >/dev/null 2>&1 || true
+    exit 0
+  fi
+  sleep 2
+done
+
+log "ERROR: n8n did not become healthy after deployment"
+docker compose ps | tee -a "$LOG_FILE"
+docker compose logs --tail=100 n8n | tee -a "$LOG_FILE"
+exit 1
