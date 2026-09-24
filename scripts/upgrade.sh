@@ -26,13 +26,25 @@ OLD_COMMIT=$(git rev-parse HEAD)
 git fetch --prune origin "$BRANCH"
 NEW_COMMIT=$(git rev-parse "origin/$BRANCH")
 
-if [[ "$OLD_COMMIT" == "$NEW_COMMIT" ]]; then
-  log "No Git changes; deployment already at $OLD_COMMIT"
-  exit 0
+if [[ "$OLD_COMMIT" != "$NEW_COMMIT" ]]; then
+  log "Updating $OLD_COMMIT -> $NEW_COMMIT"
+  git merge --ff-only "origin/$BRANCH"
+else
+  log "No Git changes; validating and reconciling the current deployment at $OLD_COMMIT"
 fi
 
-log "Updating $OLD_COMMIT -> $NEW_COMMIT"
-git merge --ff-only "origin/$BRANCH"
+required_files=(
+  "secrets/postgres_password.txt"
+  "secrets/traefik/n8n-origin.crt"
+  "secrets/traefik/n8n-origin.key"
+)
+
+for file in "${required_files[@]}"; do
+  if [[ ! -s "$file" ]]; then
+    log "ERROR: required local secret file is missing or empty: $PROJECT_DIR/$file"
+    exit 1
+  fi
+done
 
 docker compose config --quiet
 docker compose pull
@@ -50,5 +62,5 @@ done
 
 log "ERROR: n8n did not become healthy after deployment"
 docker compose ps | tee -a "$LOG_FILE"
-docker compose logs --tail=100 n8n | tee -a "$LOG_FILE"
+docker compose logs --tail=100 n8n traefik | tee -a "$LOG_FILE"
 exit 1
