@@ -246,3 +246,7 @@ After this one-time conversion, normal deployment becomes:
 cd /opt/n8n-compose
 ./scripts/upgrade.sh
 ```
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
