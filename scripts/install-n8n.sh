@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Ubuntu bootstrap for a fresh Oracle Cloud VM.
+# Ubuntu bootstrap for a fresh OCI Free Tier VM.
 # Public repository: no GitHub credentials are required for read-only clone/pull.
 
-REPO_URL="${N8N_REPO_URL:-https://github.com/huangshirui/n8n-oracle.git}"
+REPO_URL="${N8N_REPO_URL:-https://github.com/huangshirui/n8n-oci-free.git}"
 PROJECT_DIR="${N8N_PROJECT_DIR:-/opt/n8n-compose}"
 DEPLOY_USER="${SUDO_USER:-${USER}}"
 
