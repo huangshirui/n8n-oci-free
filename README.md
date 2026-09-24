@@ -48,7 +48,7 @@ printf '%s' 'YOUR_POSTGRES_PASSWORD' > secrets/postgres_password.txt
 chmod 600 secrets/postgres_password.txt
 ```
 
-Do **not** casually introduce or replace `N8N_ENCRYPTION_KEY` on an existing instance. Preserve the existing `n8n_data` volume/encryption material so existing credentials stay readable.
+Do **not** casually introduce or replace `N8N_ENCRYPTION_KEY` on an existing instance. Preserve the existing `n8n_data` Docker volume/encryption material so existing credentials stay readable.
 
 ## Deploy
 
@@ -61,13 +61,15 @@ docker compose ps
 
 ## Upgrade from GitHub
 
-The deployment does not follow Docker's floating `stable` tag. Upgrade n8n by changing `N8N_VERSION` in `.env.example`, reviewing the release, merging the change to `main`, and then running on the server:
+The deployment does not follow Docker's floating `stable` tag. The n8n and runner versions are pinned directly in `docker-compose.yml`, so Git remains the deployment source of truth.
+
+Upgrade by changing **both** n8n image tags to the same reviewed version, committing the change to `main`, and then running on the server:
 
 ```bash
 /opt/n8n-compose/scripts/upgrade.sh
 ```
 
-The script fetches `origin/main`, requires a clean tracked working tree, fast-forwards the checkout, validates Compose, pulls the declared images, recreates only changed services, waits for n8n to become healthy, and prunes only dangling images.
+The script fetches `origin/main`, requires a clean tracked working tree, fast-forwards the checkout, validates Compose, pulls the declared images, recreates only changed services, waits for n8n to become healthy, and prunes only dangling images. It does not run `docker compose down`.
 
 ## Workflow / credential export
 
@@ -93,6 +95,107 @@ Treat that directory as a secret. The export scripts are **not** a complete inst
 
 The importer requires explicit confirmation. n8n imports retain IDs, so matching IDs in the target database can be overwritten.
 
-## Server Git authentication
+## GitHub authentication on the server
 
-For a production server that only needs to pull, use a repository-specific **read-only GitHub Deploy Key** rather than a personal access token. Add the server's public SSH key in GitHub repository **Settings → Deploy keys**, with write access disabled.
+A production server only needs read access. Use a repository-specific **read-only GitHub Deploy Key**, not a personal access token.
+
+On the Linux server, as the user that owns `/opt/n8n-compose`:
+
+```bash
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+ssh-keygen -t ed25519 -f ~/.ssh/n8n-oracle -C "n8n-oracle deploy key" -N ''
+cat ~/.ssh/n8n-oracle.pub
+```
+
+Add the printed public key to this repository under **Settings → Deploy keys**. Leave **Allow write access** disabled.
+
+Then configure a dedicated SSH host alias:
+
+```bash
+cat >> ~/.ssh/config <<'EOF'
+Host github-n8n-oracle
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/n8n-oracle
+  IdentitiesOnly yes
+EOF
+
+chmod 600 ~/.ssh/config
+git ls-remote git@github-n8n-oracle:huangshirui/n8n-oracle.git
+```
+
+## Convert the existing /opt/n8n-compose directory to Git
+
+The Docker named volumes keep their identity because the Compose project remains in the same directory.
+
+First keep copies of the current local configuration:
+
+```bash
+cd /opt/n8n-compose
+cp docker-compose.yml ~/n8n-compose.docker-compose.pre-git.bak
+cp .env ~/n8n-compose.env.pre-git.bak
+```
+
+Make sure the existing `.env` contains these non-secret DB settings required by the new Compose file:
+
+```dotenv
+DB_POSTGRESDB_HOST=10.0.0.54
+DB_POSTGRESDB_PORT=5432
+DB_POSTGRESDB_DATABASE=n8n
+DB_POSTGRESDB_USER=n8n_user
+```
+
+Create the local password secret from the password used by the existing deployment:
+
+```bash
+mkdir -p /opt/n8n-compose/secrets
+printf '%s' 'YOUR_EXISTING_POSTGRES_PASSWORD' > /opt/n8n-compose/secrets/postgres_password.txt
+chmod 600 /opt/n8n-compose/secrets/postgres_password.txt
+```
+
+Then attach the existing directory to GitHub:
+
+```bash
+cd /opt/n8n-compose
+
+git init
+git remote add origin git@github-n8n-oracle:huangshirui/n8n-oracle.git
+git fetch origin main
+git checkout -f -B main origin/main
+git branch --set-upstream-to=origin/main main
+```
+
+The checkout replaces tracked configuration files but leaves ignored runtime files such as `.env`, `secrets/postgres_password.txt`, and `local-files/*` in place.
+
+Move the old root-level maintenance scripts out of the directory after the checkout:
+
+```bash
+mkdir -p ~/n8n-compose-old-scripts
+for f in upgrade.sh export.sh import.sh install-n8n.sh; do
+  [[ -e "$f" ]] && mv "$f" ~/n8n-compose-old-scripts/
+done
+```
+
+Validate before changing any running container:
+
+```bash
+docker compose config --quiet
+git status --short
+```
+
+Then apply the tracked configuration without taking the whole stack down:
+
+```bash
+docker compose pull
+docker compose up -d --remove-orphans
+docker compose ps
+curl -fsS http://127.0.0.1:5678/healthz
+```
+
+After this one-time conversion, normal deployment becomes:
+
+```bash
+cd /opt/n8n-compose
+./scripts/upgrade.sh
+```
