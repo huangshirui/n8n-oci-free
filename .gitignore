@@ -13,3 +13,6 @@ backups/
 n8n_export_*/
 *.bak
 *.log
+
+static/*
+!static/.gitkeep
