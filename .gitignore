@@ -2,6 +2,9 @@
 secrets/*
 !secrets/.gitkeep
 !secrets/*.example
+!secrets/traefik/
+secrets/traefik/*
+!secrets/traefik/.gitkeep
 
 local-files/*
 !local-files/.gitkeep
