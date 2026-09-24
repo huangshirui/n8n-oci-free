@@ -1,6 +1,6 @@
-# n8n on Oracle Cloud Free Tier
+# n8n on OCI Free Tier
 
-Production configuration for an Oracle Cloud x86 **1 vCPU / 1 GiB RAM** instance.
+Production configuration for an Oracle Cloud Infrastructure (OCI) Free Tier x86 **1 vCPU / 1 GiB RAM** instance.
 
 Architecture:
 
@@ -160,7 +160,7 @@ This repository is intended to be public. A production server therefore needs no
 Use the HTTPS remote:
 
 ```bash
-git ls-remote https://github.com/huangshirui/n8n-oracle.git
+git ls-remote https://github.com/huangshirui/n8n-oci-free.git
 ```
 
 ## Convert the existing /opt/n8n-compose directory to Git
@@ -207,7 +207,7 @@ Then attach the existing directory to GitHub:
 cd /opt/n8n-compose
 
 git init
-git remote add origin https://github.com/huangshirui/n8n-oracle.git
+git remote add origin https://github.com/huangshirui/n8n-oci-free.git
 git fetch origin main
 git checkout -f -B main origin/main
 git branch --set-upstream-to=origin/main main
