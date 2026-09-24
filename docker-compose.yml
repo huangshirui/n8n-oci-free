@@ -12,19 +12,20 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
-      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
-      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.websecure.forwardedheaders.trustedips=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32"
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - traefik_data:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik/dynamic:ro
+      - ./secrets/traefik:/certs:ro
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:2.40.5
@@ -37,7 +38,6 @@ services:
       - "traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)"
       - "traefik.http.routers.n8n.entrypoints=websecure"
       - "traefik.http.routers.n8n.tls=true"
-      - "traefik.http.routers.n8n.tls.certresolver=mytlschallenge"
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"
       - "traefik.http.middlewares.n8n-security.headers.stsSeconds=31536000"
       - "traefik.http.middlewares.n8n-security.headers.stsIncludeSubdomains=true"
@@ -48,7 +48,7 @@ services:
       N8N_HOST: "${SUBDOMAIN}.${DOMAIN_NAME}"
       N8N_PORT: "5678"
       N8N_PROTOCOL: "https"
-      N8N_PROXY_HOPS: "1"
+      N8N_PROXY_HOPS: "2"
       N8N_WEBHOOK_URL: "https://${SUBDOMAIN}.${DOMAIN_NAME}/"
       N8N_EDITOR_BASE_URL: "https://${SUBDOMAIN}.${DOMAIN_NAME}/"
       NODE_ENV: "production"
@@ -57,6 +57,8 @@ services:
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
       N8N_RESTRICT_FILE_ACCESS_TO: "/files"
+      N8N_DEFAULT_BINARY_DATA_MODE: "filesystem"
+      N8N_BINARY_DATA_STORAGE_PATH: "/home/node/.n8n/binaryData"
       N8N_RUNNERS_MODE: "external"
       N8N_RUNNERS_AUTH_TOKEN: "${N8N_RUNNERS_AUTH_TOKEN}"
       N8N_RUNNERS_BROKER_LISTEN_ADDRESS: "0.0.0.0"
@@ -70,6 +72,7 @@ services:
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: "336"
       EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
+      EXECUTIONS_DATA_MAX_DISPLAY_SIZE: "20971520"
     secrets:
       - postgres_password
     volumes:
@@ -113,7 +116,6 @@ services:
       - "traefik.http.routers.static.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`) && PathRegexp(`^/.*\\.txt$`)"
       - "traefik.http.routers.static.entrypoints=websecure"
       - "traefik.http.routers.static.tls=true"
-      - "traefik.http.routers.static.tls.certresolver=mytlschallenge"
       - "traefik.http.routers.static.priority=100"
       - "traefik.http.services.static.loadbalancer.server.port=80"
 
@@ -123,4 +125,3 @@ secrets:
 
 volumes:
   n8n_data:
-  traefik_data:
