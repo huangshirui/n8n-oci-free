@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PROJECT_DIR="${N8N_PROJECT_DIR:-/opt/n8n-compose}"
 BRANCH="${N8N_GIT_BRANCH:-main}"
-LOG_FILE="${N8N_UPGRADE_LOG:-/var/log/n8n-upgrade.log}"
+LOG_FILE="${N8N_UPGRADE_LOG:-$PROJECT_DIR/upgrade.log}"
 
 log() {
   printf '%s - %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG_FILE"
