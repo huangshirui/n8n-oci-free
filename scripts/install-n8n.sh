@@ -2,9 +2,9 @@
 set -Eeuo pipefail
 
 # Ubuntu bootstrap for a fresh Oracle Cloud VM.
-# Repository access (SSH deploy key or another Git credential) must already work.
+# Public repository: no GitHub credentials are required for read-only clone/pull.
 
-REPO_URL="${N8N_REPO_URL:-git@github.com:huangshirui/n8n-oracle.git}"
+REPO_URL="${N8N_REPO_URL:-https://github.com/huangshirui/n8n-oracle.git}"
 PROJECT_DIR="${N8N_PROJECT_DIR:-/opt/n8n-compose}"
 DEPLOY_USER="${SUDO_USER:-${USER}}"
 
