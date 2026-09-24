@@ -43,8 +43,8 @@ if [[ -e "$PROJECT_DIR" && -n "$(find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 -pr
   exit 1
 fi
 
-mkdir -p "$(dirname "$PROJECT_DIR")"
-chown "$DEPLOY_USER:$DEPLOY_USER" "$(dirname "$PROJECT_DIR")"
+mkdir -p "$PROJECT_DIR"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$PROJECT_DIR"
 sudo -u "$DEPLOY_USER" git clone "$REPO_URL" "$PROJECT_DIR"
 
 cd "$PROJECT_DIR"
@@ -60,6 +60,8 @@ fi
 if [[ ! -f secrets/postgres_password.txt ]]; then
   install -m 600 /dev/null secrets/postgres_password.txt
 fi
+
+chown "$DEPLOY_USER:$DEPLOY_USER" .env secrets/postgres_password.txt
 
 cat <<EOF
 Bootstrap complete.
